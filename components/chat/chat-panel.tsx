@@ -179,7 +179,13 @@ export function ChatPanel() {
             <Textarea
               className="min-h-20"
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Generate Shopify-ready title, description, SEO meta, specs, and Google Shopping fields for..."
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              placeholder="Generate Shopify-ready title, description, SEO meta, specs, and Google Shopping fields for… (Enter to send, Shift+Enter for newline)"
               value={input}
             />
             <Button className="sm:h-20 sm:w-14" disabled={isPending} type="submit">

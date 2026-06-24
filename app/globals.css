@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
+  --background: 210 20% 98%;
   --foreground: 222 39% 9%;
   --card: 0 0% 100%;
   --card-foreground: 222 39% 9%;
-  --border: 214 28% 90%;
+  --border: 214 28% 88%;
   --muted: 214 35% 96%;
-  --muted-foreground: 217 10% 42%;
+  --muted-foreground: 217 10% 45%;
 }
 
 .dark {
@@ -46,5 +46,5 @@ select {
 }
 
 ::selection {
-  background: rgba(10, 76, 154, 0.16);
+  background: rgba(109, 40, 217, 0.12);
 }

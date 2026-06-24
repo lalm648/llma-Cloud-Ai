@@ -9,11 +9,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-border bg-card px-4 py-5 lg:block">
         <Link className="flex items-center gap-3 px-2" href="/">
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white shadow-sm">
             <Bot className="h-5 w-5" />
           </span>
           <span>
-            <span className="block text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+            <span className="block text-sm font-semibold uppercase tracking-[0.16em] text-violet-700">
               NeoGen
             </span>
             <span className="block text-lg font-semibold leading-5">
@@ -35,9 +35,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="absolute inset-x-4 bottom-5 rounded-lg border border-border bg-muted p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Zap className="h-4 w-4 text-accent" />
+        <div className="absolute inset-x-4 bottom-5 rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-blue-50/50 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-violet-700">
+            <Zap className="h-4 w-4" />
             Speed profile
           </div>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
