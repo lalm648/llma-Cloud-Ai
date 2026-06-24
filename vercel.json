@@ -6,7 +6,8 @@
         },
         "fastapi-worker": {
             "root": "services/fastapi-worker",
-            "routePrefix": "/_/fastapi-worker"
+            "routePrefix": "/_/fastapi-worker",
+            "entrypoint": "main.py"
         }
     }
 }
