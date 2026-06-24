@@ -1,0 +1,12 @@
+{
+    "experimentalServices": {
+        "frontend": {
+            "routePrefix": "/",
+            "framework": "nextjs"
+        },
+        "fastapi-worker": {
+            "root": "services/fastapi-worker",
+            "routePrefix": "/_/fastapi-worker"
+        }
+    }
+}
