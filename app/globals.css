@@ -48,3 +48,10 @@ select {
 ::selection {
   background: rgba(109, 40, 217, 0.12);
 }
+
+@layer utilities {
+  .p-4 {
+    padding: 1rem;
+    background: #fff;
+  }
+}
