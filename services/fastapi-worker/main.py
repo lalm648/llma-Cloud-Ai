@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import base64
 import os
 from io import BytesIO
 from typing import Any
@@ -7,6 +9,7 @@ from typing import Any
 import polars as pl
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from huggingface_hub import InferenceClient
 from pydantic import BaseModel
 
 
@@ -36,9 +39,45 @@ class CsvPreview(BaseModel):
     missing_required_fields: list[str]
 
 
+class ImageGenerateRequest(BaseModel):
+    prompt: str
+    negative_prompt: str = ""
+    width: int = 1024
+    height: int = 1024
+    num_inference_steps: int = 28
+    model: str = "black-forest-labs/FLUX.2-dev"
+    provider: str = "fal-ai"
+    guidance_scale: float = 3.5
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/generate-image")
+async def generate_image(req: ImageGenerateRequest) -> dict[str, str]:
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+    if not hf_token:
+        raise HTTPException(status_code=500, detail="HF_TOKEN or HUGGINGFACE_API_KEY not configured")
+
+    def _run() -> str:
+        client = InferenceClient(provider=req.provider, api_key=hf_token)
+        image = client.text_to_image(
+            req.prompt,
+            model=req.model,
+            width=req.width,
+            height=req.height,
+            num_inference_steps=req.num_inference_steps,
+            negative_prompt=req.negative_prompt or None,
+            guidance_scale=req.guidance_scale,
+        )
+        buf = BytesIO()
+        image.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+
+    b64 = await asyncio.get_event_loop().run_in_executor(None, _run)
+    return {"url": f"data:image/png;base64,{b64}", "model": req.model, "provider": req.provider}
 
 
 @app.post("/csv/preview", response_model=CsvPreview)

@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   Search,
   Settings,
+  ShoppingBag,
   Sparkles
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ export const navigation = [
   { name: "SEO Studio", href: "/seo", icon: Search },
   { name: "Product Studio", href: "/products", icon: Boxes },
   { name: "CSV Processor", href: "/csv", icon: FileSpreadsheet },
+  { name: "Shopify SEO CSV", href: "/csv/shopify-seo", icon: ShoppingBag },
   { name: "Image Studio", href: "/image", icon: Image },
   { name: "Prompt Library", href: "/prompts", icon: Library },
   { name: "Knowledge Base", href: "/knowledge", icon: BookOpenText },

@@ -11,20 +11,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: "hsl(var(--card))",
-        "card-foreground": "hsl(var(--card-foreground))",
-        border: "hsl(var(--border))",
-        muted: "hsl(var(--muted))",
+        background:         "hsl(var(--background))",
+        foreground:         "hsl(var(--foreground))",
+        card:               "hsl(var(--card))",
+        "card-foreground":  "hsl(var(--card-foreground))",
+        border:             "hsl(var(--border))",
+        muted:              "hsl(var(--muted))",
         "muted-foreground": "hsl(var(--muted-foreground))",
+        input:              "hsl(var(--input))",
+        ring:               "hsl(var(--ring))",
         primary: {
-          DEFAULT: "#003876",
-          foreground: "#FFFFFF"
+          DEFAULT:    "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))"
         },
         accent: {
-          DEFAULT: "#0A4C9A",
-          foreground: "#FFFFFF"
+          DEFAULT:    "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))"
+        },
+        destructive: {
+          DEFAULT:    "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))"
         },
         success: "#0F8A5F",
         warning: "#A16207"
