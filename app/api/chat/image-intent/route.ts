@@ -88,11 +88,6 @@ If not an image request return {"isImageRequest":false,"imageType":"product","br
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return Response.json({ success: false, error: 'GROQ_API_KEY not set' }, { status: 500 });
-  }
-
   let body: { message?: string };
   try { body = await request.json() as { message?: string }; }
   catch { return Response.json({ isImageRequest: false }); }
@@ -105,30 +100,34 @@ export async function POST(request: NextRequest): Promise<Response> {
     return Response.json({ isImageRequest: false } satisfies Partial<ImageIntentResult>);
   }
 
-  try {
-    const result = await extractWithGroq(message, apiKey);
+  const apiKey = process.env.GROQ_API_KEY;
 
-    // Override size from raw text if Groq left default
-    if (result.isImageRequest && result.width === 1024 && result.height === 1024) {
-      const detected = detectSize(message);
-      result.width  = detected.width;
-      result.height = detected.height;
-      if (!result.imageType || result.imageType === 'product') {
-        result.imageType = detectImageType(message);
+  if (apiKey) {
+    try {
+      const result = await extractWithGroq(message, apiKey);
+
+      // Override size from raw text if Groq left default
+      if (result.isImageRequest && result.width === 1024 && result.height === 1024) {
+        const detected = detectSize(message);
+        result.width  = detected.width;
+        result.height = detected.height;
+        if (!result.imageType || result.imageType === 'product') {
+          result.imageType = detectImageType(message);
+        }
       }
-    }
-    return Response.json(result);
-  } catch {
-    // Regex fallback
-    const size = detectSize(message);
-    return Response.json({
-      isImageRequest: true,
-      imageType:      detectImageType(message),
-      brand:          '',
-      product:        '',
-      width:          size.width,
-      height:         size.height,
-      prompt:         message,
-    } satisfies ImageIntentResult);
+      return Response.json(result);
+    } catch { /* fall through to heuristic */ }
   }
+
+  // Heuristic fallback (no GROQ key, or Groq failed)
+  const size = detectSize(message);
+  return Response.json({
+    isImageRequest: true,
+    imageType:      detectImageType(message),
+    brand:          '',
+    product:        '',
+    width:          size.width,
+    height:         size.height,
+    prompt:         message,
+  } satisfies ImageIntentResult);
 }

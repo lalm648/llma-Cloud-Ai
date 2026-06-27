@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { AuditSummary, FilterKey, ProductAudit } from "@/lib/shopify-seo/types";
+import type { AuditSummary, FilterKey, IssueKey, ProductAudit } from "@/lib/shopify-seo/types";
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ export function SeoAuditPanel({
   const PAGE_SIZE = 50;
 
   const filtered = products.filter(p => {
-    if (filter !== "all" && !p.issues.includes(filter as any)) return false;
+    if (filter !== "all" && !p.issues.includes(filter as IssueKey)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (

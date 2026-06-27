@@ -1,13 +1,15 @@
 'use client';
 
-import { Copy, RefreshCw, Send, Download, CheckCircle2, Loader2 } from 'lucide-react';
+import { Copy, RefreshCw, Send, Download, CheckCircle2, Loader2, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { useMemo, useState, useTransition } from 'react';
 import { models } from '@/lib/constants';
 import { Button }   from '@/components/ui/button';
 import { Card }     from '@/components/ui/card';
 import { Select }   from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { cn }       from '@/lib/utils';
 import type { ImageIntentResult, GenerateImageResult } from '@/lib/image-gen/types';
+import { StylizedChatModal } from '@/components/chat/stylized-chatbot-modal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,8 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>(starterMessages);
   const [isPending, startTransition] = useTransition();
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [imageMode, setImageMode] = useState(false);
+  const [showArtBot, setShowArtBot] = useState(false);
 
   const lastAssistant = useMemo(
     () => [...messages].reverse().find(m => m.role === 'assistant'),
@@ -70,7 +74,7 @@ export function ChatPanel() {
 
   // ── Image generation via /api/images/generate ──────────────────────────────
 
-  async function generateChatImage(userMessage: string, msgIndex: number): Promise<void> {
+  async function generateChatImage(userMessage: string, msgIndex: number, forceImage = false): Promise<void> {
     // Extract intent
     let intent: ImageIntentResult | null = null;
     try {
@@ -82,35 +86,43 @@ export function ChatPanel() {
       if (r.ok) intent = await r.json() as ImageIntentResult;
     } catch { /* fall through to text chat */ }
 
-    if (!intent?.isImageRequest) return generateTextResponse(userMessage);
+    // When image mode is explicitly on, always generate even if intent says otherwise
+    if (!forceImage && !intent?.isImageRequest) return generateTextResponse();
+
+    // Resolve values — fall back to sensible defaults when forcing image mode
+    const genPrompt   = intent?.prompt || userMessage;
+    const genWidth    = intent?.width  || 1024;
+    const genHeight   = intent?.height || 1024;
+    const genType     = intent?.imageType || 'product';
+    const genBrand    = intent?.brand  || '';
+    const genProduct  = intent?.product || '';
 
     // Mark assistant message as loading
     setMessages(prev =>
       prev.map((m, i) =>
         i === msgIndex
-          ? { ...m, imageLoading: true, content: `Generating ${intent!.imageType?.replace(/_/g, ' ')} image${intent!.product ? ` for "${intent!.product}"` : ''}… (${intent!.width}×${intent!.height})` }
+          ? { ...m, imageLoading: true, content: `Generating ${genType.replace(/_/g, ' ')} image${genProduct ? ` for "${genProduct}"` : ''}… (${genWidth}×${genHeight})` }
           : m,
       ),
     );
 
     // Generate image
     const provider = (localStorage.getItem('neogen_image_provider') ?? 'huggingface') as string;
-    const prompt = intent.prompt || userMessage;
 
     try {
       const genResp = await fetch('/api/images/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt,
+          prompt:       genPrompt,
           negativePrompt: 'text, watermark, logo, blurry, low quality, distorted',
-          width:    intent.width  || 1024,
-          height:   intent.height || 1024,
+          width:        genWidth,
+          height:       genHeight,
           provider,
           numImages: 1,
-          imageType: intent.imageType || 'product',
-          brand:    intent.brand   || '',
-          productTitle: intent.product || '',
+          imageType:    genType,
+          brand:        genBrand,
+          productTitle: genProduct,
         }),
       });
 
@@ -125,7 +137,7 @@ export function ChatPanel() {
                   imageLoading: false,
                   content: `Here${result.images.length > 1 ? ' are' : "'s"} your generated image${result.images.length > 1 ? 's' : ''}:`,
                   images: result.images.map(img => img.url),
-                  imagePrompt: prompt,
+                  imagePrompt: genPrompt,
                 }
               : m,
           ),
@@ -151,7 +163,7 @@ export function ChatPanel() {
 
   // ── Streaming text response ────────────────────────────────────────────────
 
-  async function generateTextResponse(prompt: string): Promise<void> {
+  async function generateTextResponse(): Promise<void> {
     const historyForApi = messages
       .filter(m => m.content && !m.imageLoading)
       .map(m => ({ role: m.role, content: m.content }));
@@ -163,10 +175,15 @@ export function ChatPanel() {
     });
 
     if (!response.ok || !response.body) {
-      const fallback = await response.text();
+      let errText = await response.text().catch(() => '');
+      try { const j = JSON.parse(errText) as { error?: string }; errText = j.error ?? errText; } catch { /* raw text */ }
+      const isGroqMissing = errText.includes('GROQ_API_KEY') || errText.includes('Missing GROQ');
+      const displayMsg = isGroqMissing
+        ? 'Chat requires a Groq API key. Add GROQ_API_KEY to your .env.local and restart the dev server. Get a free key at console.groq.com/keys'
+        : errText || 'AI request failed.';
       setMessages(prev =>
         prev.map((m, i) =>
-          i === prev.length - 1 ? { ...m, content: fallback || 'AI request failed.' } : m,
+          i === prev.length - 1 ? { ...m, content: displayMsg } : m,
         ),
       );
       return;
@@ -204,10 +221,10 @@ export function ChatPanel() {
     const assistantIdx = nextMessages.length - 1;
 
     startTransition(async () => {
-      if (looksLikeImageRequest(trimmed)) {
-        await generateChatImage(trimmed, assistantIdx);
+      if (imageMode || looksLikeImageRequest(trimmed)) {
+        await generateChatImage(trimmed, assistantIdx, imageMode);
       } else {
-        await generateTextResponse(trimmed);
+        await generateTextResponse();
       }
     });
   }
@@ -243,13 +260,16 @@ export function ChatPanel() {
         <div className="mt-6 rounded-lg border border-border bg-muted/40 p-3">
           <p className="text-xs font-semibold text-muted-foreground">Image commands</p>
           <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
-            <li>"Generate product image for Creed Aventus"</li>
-            <li>"Create homepage banner 1920x720"</li>
-            <li>"Make Instagram post for Samsonite"</li>
-            <li>"Generate Google ad 300x250"</li>
+            <li>&ldquo;Generate product image for Creed Aventus&rdquo;</li>
+            <li>&ldquo;Create homepage banner 1920x720&rdquo;</li>
+            <li>&ldquo;Make Instagram post for Samsonite&rdquo;</li>
+            <li>&ldquo;Generate Google ad 300x250&rdquo;</li>
           </ul>
         </div>
       </aside>
+
+      {/* Stylized Art Bot modal */}
+      {showArtBot && <StylizedChatModal onClose={() => setShowArtBot(false)} />}
 
       {/* Chat area */}
       <Card className="flex min-h-[620px] flex-col overflow-hidden">
@@ -261,6 +281,14 @@ export function ChatPanel() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              aria-label="Stylized Art Assistant"
+              onClick={() => setShowArtBot(true)}
+              size="icon" type="button" variant="ghost"
+              title="Open Stylized Art Assistant (Gemini)"
+            >
+              <Sparkles className="h-4 w-4 text-violet-500" />
+            </Button>
             <Button
               aria-label="Copy last response"
               onClick={() => navigator.clipboard.writeText(lastAssistant?.content ?? '')}
@@ -285,7 +313,7 @@ export function ChatPanel() {
                 className={
                   message.role === 'user'
                     ? 'ml-auto max-w-[85%] rounded-lg bg-primary px-4 py-3 text-sm leading-6 text-primary-foreground'
-                    : 'max-w-[88%] whitespace-pre-wrap rounded-lg bg-muted px-4 py-3 text-sm leading-6'
+                    : 'max-w-[88%] whitespace-pre-wrap rounded-lg bg-muted px-4 text-sm leading-6'
                 }
               >
                 {message.imageLoading
@@ -342,28 +370,70 @@ export function ChatPanel() {
           ))}
         </div>
 
-        <form
-          className="border-t border-border p-4"
-          onSubmit={e => { e.preventDefault(); void sendMessage(); }}
-        >
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Textarea
-              className="min-h-20"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  void sendMessage();
-                }
-              }}
-              placeholder="Ask anything, or type 'Generate a product image for…' to create images inline (Enter to send)"
-            />
-            <Button className="sm:h-20 sm:w-14" disabled={isPending} type="submit">
-              <Send className="h-4 w-4" />
-            </Button>
+        <div className="border-t border-border p-4">
+          {/* Mode switcher */}
+          <div className="mb-3 flex items-center gap-1 rounded-lg bg-muted p-1 w-fit">
+            <button
+              type="button"
+              onClick={() => setImageMode(false)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                !imageMode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Send className="h-3 w-3" />
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setImageMode(true)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                imageMode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ImageIcon className="h-3 w-3" />
+              Image
+            </button>
           </div>
-        </form>
+
+          <form
+            onSubmit={e => { e.preventDefault(); void sendMessage(); }}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Textarea
+                className={cn(
+                  "min-h-20",
+                  imageMode && "border-primary ring-1 ring-primary/40",
+                )}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                placeholder={
+                  imageMode
+                    ? "Describe the image: subject, style, size, mood, lighting…"
+                    : "Ask anything about products, SEO, ecommerce… (Enter to send)"
+                }
+              />
+              <Button
+                className="sm:h-full sm:w-12"
+                disabled={isPending}
+                type="submit"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </form>
+        </div>
       </Card>
     </div>
   );

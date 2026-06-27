@@ -22,7 +22,7 @@ import { buildPrompt, DEFAULT_NEG } from '@/lib/image-gen/prompt-builder';
 type TabKey =
   | 'product' | 'lifestyle' | 'homepage_banner' | 'mobile_banner'
   | 'collection_banner' | 'social_post' | 'google_display'
-  | 'history' | 'settings';
+  | 'custom_prompt' | 'history' | 'settings';
 
 type TabConfig = {
   key: TabKey;
@@ -41,6 +41,7 @@ const TABS: TabConfig[] = [
   { key: 'collection_banner', label: 'Collection Banner', imageType: 'collection_banner', defaultWidth: 1920, defaultHeight: 600,  presetKeys: ['collection'] },
   { key: 'social_post',       label: 'Social Post',       imageType: 'social_post',       defaultWidth: 1080, defaultHeight: 1080, presetKeys: ['instagram_post', 'instagram_story', 'facebook_ad'] },
   { key: 'google_display',    label: 'Google Display',    imageType: 'google_display',    defaultWidth: 300,  defaultHeight: 250,  presetKeys: ['google_300x250', 'google_336x280', 'google_728x90', 'google_300x600', 'google_320x100', 'google_970x250'] },
+  { key: 'custom_prompt',     label: 'Custom Prompt',     defaultWidth: 1024,             defaultHeight: 1024, presetKeys: ['product_sq', 'homepage', 'collection', 'instagram_post', 'instagram_story', 'facebook_ad', 'mobile_banner'] },
   { key: 'history',           label: 'Image History',     defaultWidth: 1024,             defaultHeight: 1024, presetKeys: [] },
   { key: 'settings',          label: 'Provider Settings', defaultWidth: 1024,             defaultHeight: 1024, presetKeys: [] },
 ];
@@ -283,7 +284,7 @@ function HistoryPanel({
       <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 text-muted-foreground">
         <Inbox className="h-10 w-10 opacity-30" />
         <p className="text-sm">No images saved yet</p>
-        <p className="text-xs opacity-60">Generate images and click "+ History" to save them</p>
+        <p className="text-xs opacity-60">Generate images and click &ldquo;+ History&rdquo; to save them</p>
       </div>
     );
   }
@@ -761,8 +762,111 @@ export function ImageStudio() {
         <SettingsPanel currentProvider={form.provider} onSet={handleProviderChange} />
       )}
 
+      {/* Custom Prompt tab — paste any detailed prompt, skip the form fields */}
+      {tab === 'custom_prompt' && (
+        <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
+          <Card className="p-4">
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Your Prompt
+                </label>
+                <Textarea
+                  className="min-h-[200px] text-sm"
+                  placeholder={"Paste your full detailed prompt here…\n\nExample:\nA luxury Creed Aventus perfume bottle, gold cap, clear glass, studio lighting on white marble, photorealistic, 8K sharp focus, product photography"}
+                  value={form.prompt}
+                  onChange={e => patchForm({ prompt: e.target.value })}
+                />
+              </div>
+              <Field label="Negative Prompt">
+                <Textarea
+                  className="min-h-[56px] text-sm"
+                  placeholder="blurry, low quality, watermark, text, distorted…"
+                  value={form.negativePrompt}
+                  onChange={e => patchForm({ negativePrompt: e.target.value })}
+                />
+              </Field>
+              <Field label="Size Presets">
+                <div className="flex flex-wrap gap-1.5">
+                  {SIZE_PRESETS.filter(p =>
+                    ['product_sq','homepage','collection','instagram_post','instagram_story','facebook_ad','mobile_banner'].includes(p.key)
+                  ).map(p => (
+                    <button
+                      key={p.key} type="button"
+                      onClick={() => patchForm({ width: p.width, height: p.height })}
+                      className={cn(
+                        'rounded border px-2.5 py-1 text-xs font-medium transition-colors',
+                        form.width === p.width && form.height === p.height
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground',
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Width (px)">
+                  <Input type="number" value={form.width} onChange={e => patchForm({ width: parseInt(e.target.value) || 1024 })} />
+                </Field>
+                <Field label="Height (px)">
+                  <Input type="number" value={form.height} onChange={e => patchForm({ height: parseInt(e.target.value) || 1024 })} />
+                </Field>
+              </div>
+              <QualitySelector
+                value={form.qualityProfile}
+                imageType="product"
+                onChange={q => patchForm({ qualityProfile: q })}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Images">
+                  <Select value={String(form.numImages)} onChange={e => patchForm({ numImages: parseInt(e.target.value) })}>
+                    {[1, 2, 3, 4].map(n => (
+                      <option key={n} value={n}>{n} image{n > 1 ? 's' : ''}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Provider">
+                  <Select value={form.provider} onChange={e => handleProviderChange(e.target.value as ImageProvider)}>
+                    <option value="huggingface">HuggingFace</option>
+                    <option value="replicate">Replicate</option>
+                    <option value="fal">Fal.ai</option>
+                    <option value="comfyui">ComfyUI (Local)</option>
+                  </Select>
+                </Field>
+              </div>
+              <Button
+                onClick={handleGenerate}
+                disabled={!form.prompt.trim() || gen.status === 'generating'}
+                className="mt-1 w-full gap-2" type="button"
+              >
+                {gen.status === 'generating'
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
+                  : <><ImageIcon className="h-4 w-4" /> Generate Image</>}
+              </Button>
+            </div>
+          </Card>
+          <div>
+            {gen.status === 'idle'       && <IdleState />}
+            {gen.status === 'generating' && <LoadingState provider={form.provider} />}
+            {gen.status === 'error'      && <ErrorState error={gen.error!} onRetry={handleGenerate} />}
+            {gen.status === 'done'       && (
+              <ImageGrid
+                images={gen.images}
+                copiedId={copiedId}
+                onDownload={downloadImage}
+                onCopy={handleCopy}
+                onSave={handleSave}
+                onRegenerate={handleGenerate}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Generation tabs */}
-      {tab !== 'history' && tab !== 'settings' && (
+      {tab !== 'history' && tab !== 'settings' && tab !== 'custom_prompt' && (
         <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
           <Card className="p-4">
             <GeneratorForm
